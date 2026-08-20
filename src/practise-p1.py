@@ -1,6 +1,11 @@
+import numpy as np
+
 # Three neurons feeding into this neuron, their outputs become the inputs.
 # Moved forwards to a hidden input layer
-inputs = [1, 2, 3, 2.5]
+# Batch of inputs
+inputs = [[1, 2, 3, 2.5],
+          [2.0, 5.0, -1.0, 2.0],
+          [-1.5, 2.7, 3.3, -0.8]]
 
 # Every input has a unique weight associated with it
 weights = [[0.2, 0.8, -0.5, 1.0],
@@ -10,7 +15,21 @@ weights = [[0.2, 0.8, -0.5, 1.0],
 # Every unique neuron has a unique bias
 biases = [2, 3, 0.5]
 
+# New layer
+weights2 = [[0.1, -0.14, 0.5],
+           [-0.5, 0.12, -0.33],
+           [-0.44, 0.73, -0.13]]
 
+biases2 = [-1, 2, -0.5]
+
+# Convert weights to a numpy array and transpose
+layer1_outputs = np.dot(inputs, np.array(weights).T) + biases
+
+layer2_output = np.dot(layer1_outputs, np.array(weights2).T) + biases2
+
+print(layer2_output)
+
+'''
 layer_outputs = [] # Output of current layer
 for neuron_weights, neuron_bias in zip(weights, biases):
     neuron_output = 0 # Output of given neuron
@@ -20,5 +39,5 @@ for neuron_weights, neuron_bias in zip(weights, biases):
     layer_outputs.append(neuron_output)
 
 print(layer_outputs)
-
+'''
  
