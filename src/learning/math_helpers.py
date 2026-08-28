@@ -14,7 +14,6 @@ def matrix_vector_multiplication(m, v):
                 total += (m[i][j])
 
 
-def transpose(m):
-    
+
 
         
