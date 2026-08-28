@@ -133,12 +133,12 @@ class Loss_CategoricalCrossEntropy:
 # DATASET
 # -------------------------------------------------------------------------
 
-# Create a hard-coded dataset
+# Create a hard-coded dataset with <END> tokens
 sentences = [
-    "the cat sat",
-    "the cat ate",
-    "the dog sat",
-    "the dog ate"
+    "the cat sat <END>",
+    "the cat ate <END>",
+    "the dog sat <END>",
+    "the dog ate <END>"
 ]
 
 # -------------------------------------------------------------------------
@@ -151,17 +151,17 @@ for sentence in sentences:
     for word in sentence.split():
         vocabulary.add(word)
 
+# Sort vocabulary for consistent IDs
+vocabulary = sorted(vocabulary)
+
 # -------------------------------------------------------------------------
 # WORD => ID
 # -------------------------------------------------------------------------
 
 # Turn words into numbers using a dictionary
 word_to_id = {
-    "the": 0,
-    "cat": 1,
-    "sat": 2,
-    "ate": 3,
-    "dog": 4
+    word: i
+    for i, word in enumerate(vocabulary)
 }
 
 # -------------------------------------------------------------------------
@@ -170,11 +170,8 @@ word_to_id = {
 
 # Reverse dictionary
 id_to_word = {
-    0: "the",
-    1: "cat",
-    2: "sat",
-    3: "ate",
-    4: "dog"
+    i: word
+    for word, i in word_to_id.items()
 }
 
 # -------------------------------------------------------------------------
@@ -398,4 +395,56 @@ for timestep in range(len(test_sequence) - 1):
     print("Target: ", id_to_word[target_word])
     print("Prediction: ", id_to_word[prediction])
     print("Probabilities: ", activation_softmax.output)
+
+
+# -------------------------------------------------------------------------
+# TEXT GENERATION
+# -------------------------------------------------------------------------
+
+def generate_text(start_word, number_of_words):
+
+
+    current_word = word_to_id[start_word]
+    hidden = np.zeros((1, 10))
+    rnn.reset_history()
+
+    generated_words = [start_word]
+
+    # Generate one word at a time
+    for _ in range(number_of_words):
+        input_vector = one_hot(current_word, len(word_to_id)).reshape(1, -1)
+
+        rnn.forward(input_vector, hidden)
+        hidden = rnn.output
+
+        output_layer.forward(hidden)
+
+        activation_softmax.forward(output_layer.output)
+
+        # Choose most likely word
+        #prediction = np.argmax(activation_softmax.output)
+
+        # Sampling from probability distribution
+        # To give other words a chance, instead of always choosing the max
+        prediction = np.random.choice(len(word_to_id), p=activation_softmax.output[0])
+
+        predicted_word = id_to_word[prediction]
+
+        # Stop if the model predicts <END> token
+        if predicted_word == "<END>":
+            break
+
+        generated_words.append(predicted_word)
+
+        # Feed prediction back into RNN
+        current_word = prediction
+
+    return " ".join(generated_words)
+
+print()
+print("==========")
+print("GENERATED TEXT")
+print("==========")
+
+print(generate_text("the", 5))
 
