@@ -50,12 +50,12 @@ class RNN:
         hidden = self.hidden_history[timestep]
         output = self.outputs_history[timestep]
 
-        # Backprop through tanh
-        dtanh = dvalues * (1 - output ** 2)
-
         # Add gradient coming from next timestep
-         # Gradient at this timestep = gradient from output + gradient from future hidden state
-        dtanh = dtanh + dhidden_next
+        # Gradient at this timestep = gradient from output + gradient from future hidden state
+        total_gradient = dvalues + dhidden_next
+
+        # Backprop through tanh
+        dtanh = total_gradient * (1 - output ** 2)
 
         # Calculate gradients for the RNN weights
         # Added because the same weights are used at every timestep
@@ -337,9 +337,17 @@ for epoch in range(epochs):
             dhidden_next = rnn.dhidden
 
     # -------------------------------------------------------------------------
-    # UPDATE WEIGHTS
+    # CLIP AND UPDATE WEIGHTS
     # -------------------------------------------------------------------------
             
+    # Clip weights before updating to prevent exploding gradients
+    np.clip(output_layer.dweights, -5, 5, out=output_layer.dweights)
+    np.clip(output_layer.dbiases, -5, 5, out=output_layer.dbiases)
+
+    np.clip(rnn.dweights_inputs, -5, 5, out=rnn.dweights_inputs)
+    np.clip(rnn.dweights_hidden, -5, 5, out=rnn.dweights_hidden)
+    np.clip(rnn.dbiases, -5, 5, out=rnn.dbiases)
+
     # Update output layer weights
     output_layer.weights -= learning_rate * output_layer.dweights
     output_layer.biases -= learning_rate * output_layer.dbiases
@@ -353,7 +361,8 @@ for epoch in range(epochs):
     # PRINT LOSS
     # -------------------------------------------------------------------------
 
-    average_loss = total_loss / (len(sequences) * 2)
+    total_predictions = sum(len(sequence) - 1 for sequence in sequences)
+    average_loss = total_loss / total_predictions
 
     if epoch % 100 == 0:
         print("Epoch: ", epoch)
@@ -401,7 +410,22 @@ for timestep in range(len(test_sequence) - 1):
 # TEXT GENERATION
 # -------------------------------------------------------------------------
 
-def generate_text(start_word, number_of_words):
+
+def sample_prediction(probabilities, temperature = 1.0):
+
+    probabilities = np.asarray(probabilities, dtype=np.float64)
+
+    # Temperature controls randomness
+    probabilities = np.log(probabilities + 1e-7) / temperature
+
+    probabilities = np.exp(probabilities - np.max(probabilities))
+    probabilities /= np.sum(probabilities)
+
+    prediction = np.random.choice(len(probabilities), p=probabilities)
+
+    return prediction
+
+def generate_text(start_word, number_of_words, temperature = 1.0):
 
 
     current_word = word_to_id[start_word]
@@ -426,7 +450,7 @@ def generate_text(start_word, number_of_words):
 
         # Sampling from probability distribution
         # To give other words a chance, instead of always choosing the max
-        prediction = np.random.choice(len(word_to_id), p=activation_softmax.output[0])
+        prediction = sample_prediction(activation_softmax.output[0], temperature)
 
         predicted_word = id_to_word[prediction]
 
@@ -446,5 +470,9 @@ print("==========")
 print("GENERATED TEXT")
 print("==========")
 
-print(generate_text("the", 5))
+print(generate_text("the", 5, temperature = 2.0))
 
+# Temperature examples: 
+# 0.2 - very predictable
+# 1.0 - normal sampling
+# 2.0 - more random
