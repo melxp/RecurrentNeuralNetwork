@@ -1,5 +1,7 @@
 import numpy as np
 
+np.random.seed(42)
+
 # -------------------------------------------------------------------------
 # RNN
 # -------------------------------------------------------------------------
@@ -32,7 +34,6 @@ class RNN:
         self.hidden_history.append(hidden)
 
         # RNN equation to calculate hidden state
-        # h_t = x_t W_x + h_(t-1) W_h + b
         self.output = np.dot(inputs, self.weights_inputs) + \
                         np.dot(hidden, self.weights_hidden) + \
                         self.biases
@@ -43,7 +44,9 @@ class RNN:
         # Store current hidden state
         self.outputs_history.append(self.output)
 
-    def backward(self, dvalues, timestep, dhidden_next):
+        return self.output
+
+    def backward(self, dhidden_from_output, timestep, dhidden_next):
 
         # Get values from timestep
         inputs = self.inputs_history[timestep]
@@ -52,10 +55,10 @@ class RNN:
 
         # Add gradient coming from next timestep
         # Gradient at this timestep = gradient from output + gradient from future hidden state
-        total_gradient = dvalues + dhidden_next
+        dhidden_total = dhidden_from_output + dhidden_next
 
         # Backprop through tanh
-        dtanh = total_gradient * (1 - output ** 2)
+        dtanh = dhidden_total * (1 - output ** 2)
 
         # Calculate gradients for the RNN weights
         # Added because the same weights are used at every timestep
@@ -85,16 +88,16 @@ class OutputLayer:
     def forward(self, inputs):
         self.output = np.dot(inputs, self.weights) + self.biases
 
-    def backward(self, dvalues, inputs):
+    def backward(self, dhidden_from_output, inputs):
 
         # Gradient of weights
-        self.dweights += np.dot(inputs.T, dvalues)
+        self.dweights += np.dot(inputs.T, dhidden_from_output)
 
         # Gradient of biases
-        self.dbiases += dvalues
+        self.dbiases += dhidden_from_output
 
         # Gradient passed back to hidden state
-        self.dinputs = np.dot(dvalues, self.weights.T)
+        self.dinputs = np.dot(dhidden_from_output, self.weights.T)
 
 
 # -------------------------------------------------------------------------
@@ -134,12 +137,65 @@ class Loss_CategoricalCrossEntropy:
 # -------------------------------------------------------------------------
 
 # Create a hard-coded dataset with <END> tokens
+
+'''
+# Dataset 1: Short, simple sequences
+# ~0.95 loss
 sentences = [
     "the cat sat <END>",
     "the cat ate <END>",
+    "the cat ran <END>",
+    "the cat slept <END>",
     "the dog sat <END>",
-    "the dog ate <END>"
+    "the dog ate <END>",
+    "the dog ran <END>",
+    "the dog slept <END>"
+    "the rabbit sat <END>",
+    "the rabbit ate <END>",
+    "the rabbit ran <END>",
+    "the rabbit slept <END>"
 ]
+'''
+
+'''
+# Dataset 2: Longer sequences
+# ~1.1 loss
+sentences = [
+    "the cat sat on the mat <END>",
+    "the cat caught the fish <END>",
+    "the cat licked the toy <END>",
+    "the dog ate from the bowl <END>",
+    "the dog ran to the park <END>",
+    "the dog ate the chicken <END>",
+    "the rabbit bit the carrot <END>",
+    "the rabbit ate the carrot <END>",
+    "the rabbit sat on the mat <END>"
+]
+'''
+
+'''
+# Dataset 3: Combinations (sat -> on/by, ate -> the/from)
+# ~0.86 loss
+sentences = [
+    "the cat sat on the mat <END>",
+    "the cat ate the fish <END>",
+    "the dog sat by the bed <END>",
+    "the dog ate from the bowl <END>",
+    "the rabbit sat on the grass <END>",
+    "the rabbit ate the carrot <END>"
+]
+'''
+
+# Dataset 4: Long range dependencies
+# Vanilla RNN baseline: ~0.44 loss
+sentences = [
+    "the small cat that was quiet and very friendly sat on the mat <END>",
+    "the big dog that was loud and very playful sat on the bed <END",
+    
+    "the small rabbit that was quiet and very gentle ate the carrot <END>",
+    "the big rabbit that was loud and very energetic ate the carrot <END>", 
+]
+
 
 # -------------------------------------------------------------------------
 # VOCABULARY
@@ -296,10 +352,7 @@ for epoch in range(epochs):
             input_vector = one_hot(input_word, len(word_to_id)).reshape(1, -1)
 
             # RNN forward
-            rnn.forward(input_vector, hidden)
-
-            # Save current hidden state
-            hidden = rnn.output
+            hidden = rnn.forward(input_vector, hidden)
 
             # Output layer forward
             output_layer.forward(hidden)
@@ -313,11 +366,11 @@ for epoch in range(epochs):
             total_loss += loss
 
             # SoftMax & Cross-Entropy gradient
-            dvalues = activation_softmax.output.copy()
-            dvalues[0, target_word] -= 1
+            dhidden_from_output = activation_softmax.output.copy()
+            dhidden_from_output[0, target_word] -= 1
 
             # Output layer backward
-            output_layer.backward(dvalues, hidden)
+            output_layer.backward(dhidden_from_output, hidden)
 
             # Save gradient from timestep
             output_gradients.append(output_layer.dinputs.copy())  
@@ -340,7 +393,17 @@ for epoch in range(epochs):
     # CLIP AND UPDATE WEIGHTS
     # -------------------------------------------------------------------------
             
-    # Clip weights before updating to prevent exploding gradients
+    # Average gradients across all sequences
+    num_sequences = len(sequences)
+
+    output_layer.dweights /= num_sequences
+    output_layer.dbiases /= num_sequences
+
+    rnn.dweights_inputs /= num_sequences
+    rnn.dweights_hidden /= num_sequences
+    rnn.dbiases /= num_sequences
+
+    # Clip gradients before updating to prevent exploding gradients
     np.clip(output_layer.dweights, -5, 5, out=output_layer.dweights)
     np.clip(output_layer.dbiases, -5, 5, out=output_layer.dbiases)
 
@@ -470,7 +533,10 @@ print("==========")
 print("GENERATED TEXT")
 print("==========")
 
-print(generate_text("the", 5, temperature = 2.0))
+print(generate_text("the", 20, temperature = 0.2))
+print(generate_text("the", 20, temperature = 0.5))
+print(generate_text("cat", 20, temperature = 0.2))
+print(generate_text("dog", 20, temperature = 0.2))
 
 # Temperature examples: 
 # 0.2 - very predictable
