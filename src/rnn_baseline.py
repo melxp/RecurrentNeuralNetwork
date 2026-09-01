@@ -190,7 +190,7 @@ sentences = [
 # Vanilla RNN baseline: ~0.44 loss
 sentences = [
     "the small cat that was quiet and very friendly sat on the mat <END>",
-    "the big dog that was loud and very playful sat on the bed <END",
+    "the big dog that was loud and very playful sat on the bed <END>",
     
     "the small rabbit that was quiet and very gentle ate the carrot <END>",
     "the big rabbit that was loud and very energetic ate the carrot <END>", 
